@@ -1,0 +1,122 @@
+# =============================================================================
+# ToroDev — Apache config (Hostatom / cPanel)
+# ทุกบล็อกห่อด้วย <IfModule> ไว้แล้ว ถ้าโฮสต์ไม่มีโมดูลนั้นจะข้ามไป ไม่พังทั้งเว็บ
+# ถ้าเจอ Error 500 หลังอัปโหลด ให้ลองคอมเมนต์บล็อกล่าสุดที่เพิ่มเข้าไปออกทีละอัน
+# =============================================================================
+
+# ---------- ภาษาและ charset ----------
+AddDefaultCharset UTF-8
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType image/svg+xml            .svg
+  AddType image/webp               .webp
+  AddCharset UTF-8 .html .css .js .json .xml .svg .webmanifest
+</IfModule>
+
+# ---------- หน้า error ----------
+ErrorDocument 404 /404.html
+
+# ---------- ปิดการไล่ดูไฟล์ในโฟลเดอร์ ----------
+Options -Indexes
+
+# ---------- บังคับ HTTPS ----------
+# เปิดใช้หลังจากติดตั้ง SSL ใน cPanel เรียบร้อยแล้ว
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+  # ---- เลือกอย่างใดอย่างหนึ่ง: บังคับแบบไม่มี www (ค่าเริ่มต้น) ----
+  RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+  RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+
+  # ---- หรือถ้าอยากใช้ www ให้คอมเมนต์ 2 บรรทัดบน แล้วเปิด 2 บรรทัดนี้แทน ----
+  # RewriteCond %{HTTP_HOST} !^www\. [NC]
+  # RewriteRule ^(.*)$ https://www.%{HTTP_HOST}/$1 [R=301,L]
+
+  # พิมพ์ /services ก็ไปหน้า /services.html ได้ (ไม่บังคับ แค่สะดวก)
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME}\.html -f
+  RewriteRule ^([^\.]+)$ $1.html [NC,L]
+</IfModule>
+
+# ---------- บีบอัดไฟล์ก่อนส่ง ----------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+  AddOutputFilterByType DEFLATE application/javascript application/x-javascript text/javascript
+  AddOutputFilterByType DEFLATE application/json application/xml application/rss+xml
+  AddOutputFilterByType DEFLATE image/svg+xml application/manifest+json
+</IfModule>
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html text/css text/javascript
+  AddOutputFilterByType BROTLI_COMPRESS application/javascript application/json image/svg+xml
+</IfModule>
+
+# ---------- แคชฝั่งเบราว์เซอร์ ----------
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault                          "access plus 1 month"
+  ExpiresByType text/html                 "access plus 0 seconds"
+  ExpiresByType text/css                  "access plus 1 year"
+  ExpiresByType application/javascript    "access plus 1 year"
+  ExpiresByType text/javascript           "access plus 1 year"
+  ExpiresByType image/webp                "access plus 1 year"
+  ExpiresByType image/png                 "access plus 1 year"
+  ExpiresByType image/jpeg                "access plus 1 year"
+  ExpiresByType image/svg+xml             "access plus 1 year"
+  ExpiresByType image/x-icon              "access plus 1 year"
+  ExpiresByType application/manifest+json "access plus 1 week"
+  ExpiresByType application/xml           "access plus 1 day"
+</IfModule>
+
+<IfModule mod_headers.c>
+  # ไฟล์ static แคชยาว ๆ ได้ เพราะถ้าแก้แล้วให้เปลี่ยนชื่อไฟล์หรือเติม ?v=2 ท้าย URL
+  <FilesMatch "\.(css|js|webp|png|jpe?g|gif|svg|ico|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\.(html|xml|json|webmanifest)$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
+  </FilesMatch>
+
+  # ---------- Security headers ----------
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+
+  # เว็บนี้โหลดฟอนต์จาก Google Fonts อย่างเดียว ที่เหลืออยู่บนโดเมนตัวเอง
+  # ถ้าวันหนึ่งติดสคริปต์เพิ่ม (เช่น Google Analytics, Facebook Pixel)
+  # ต้องเติมโดเมนนั้นเข้าไปใน script-src / connect-src ด้วย ไม่งั้นจะถูกบล็อก
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; form-action 'self'; upgrade-insecure-requests"
+
+  # เปิด HSTS หลังจากมั่นใจแล้วว่า HTTPS ใช้งานได้ปกติทุกหน้า (ย้อนกลับยาก)
+  # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+  # ไม่ต้องบอกโลกว่าใช้ PHP เวอร์ชันอะไร
+  Header unset X-Powered-By
+  Header always unset X-Powered-By
+</IfModule>
+
+# ---------- ปิดไฟล์ที่ไม่ควรให้คนนอกเปิด ----------
+<IfModule mod_authz_core.c>
+  <FilesMatch "^\.|\.(log|bak|old|sql|ini|sh|md)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+  <FilesMatch "^\.|\.(log|bak|old|sql|ini|sh|md)$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  # กันคนเดาชื่อไฟล์ log ของฟอร์ม
+  RewriteRule ^torodev-leads\.log$ - [F,L]
+
+  # โฟลเดอร์ไฟล์ต้นฉบับ (ถ้าเผลออัปโหลดขึ้นมา จะเปิดจากภายนอกไม่ได้)
+  RewriteRule ^(_source|รูปคนในทีม|โลโก้และธีมการออกแบบV2)/ - [F,L]
+</IfModule>

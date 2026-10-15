@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="ToroDev">
+  <rect width="100" height="100" rx="22" fill="#0C0C0C"/>
+  <g transform="translate(6.75 7.18) scale(0.865)">
+    <path d="M13,18L13,44A37,37 0 0 0 87,44L87,18L75,18L75,42A25,25 0 0 1 25,42L25,18Z" fill="#F4F2EF"/>
+    <circle cx="50" cy="42" r="11" fill="#1ED760"/>
+  </g>
+</svg>

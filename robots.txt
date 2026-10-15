@@ -1,0 +1,8 @@
+# ToroDev — https://torodev.co.th
+User-agent: *
+Allow: /
+
+# ไม่ต้องเก็บ index ให้กับปลายทางของฟอร์ม
+Disallow: /contact.php
+
+Sitemap: https://torodev.co.th/sitemap.xml
